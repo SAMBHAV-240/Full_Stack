@@ -1,0 +1,154 @@
+// Prisma Schema for Task Collaboration Platform
+// Database: MongoDB
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+  id        String   @id @default(uuid()) @map("_id")
+  email     String   @unique
+  password  String
+  name      String
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ownedBoards   Board[]          @relation("BoardOwner")
+  boardMembers  BoardMember[]
+  assignedTasks TaskAssignee[]
+  activities    Activity[]
+  comments      Comment[]
+}
+
+// Board model - main container for lists and tasks
+model Board {
+  id          String   @id @default(uuid()) @map("_id")
+  name        String
+  description String?
+  background  String   @default("#1e3a5f")
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Owner relation
+  ownerId String
+  owner   User   @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Relations
+  lists      List[]
+  members    BoardMember[]
+  activities Activity[]
+
+  @@index([ownerId])
+}
+
+// Board member with role
+model BoardMember {
+  id        String   @id @default(uuid()) @map("_id")
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, boardId])
+}
+
+// List model - column in a board
+model List {
+  id        String   @id @default(uuid()) @map("_id")
+  name      String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  tasks Task[]
+
+  @@index([boardId])
+}
+
+// Task model - individual task cards
+model Task {
+  id          String    @id @default(uuid()) @map("_id")
+  title       String
+  description String?
+  position    Int       @default(0)
+  priority    String    @default("medium")
+  dueDate     DateTime?
+  labels      String?
+  isArchived  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  listId String
+  list   List   @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  // Relations
+  assignees  TaskAssignee[]
+  comments   Comment[]
+  activities Activity[]
+
+  @@index([listId])
+}
+
+// Task assignee junction table
+model TaskAssignee {
+  id         String   @id @default(uuid()) @map("_id")
+  assignedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+}
+
+// Comment model for task discussions
+model Comment {
+  id        String   @id @default(uuid()) @map("_id")
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+// Activity log for tracking changes
+model Activity {
+  id          String   @id @default(uuid()) @map("_id")
+  action      String
+  entityType  String
+  entityId    String
+  description String
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boardId String?
+  board   Board?  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  taskId  String?
+  task    Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([boardId])
+  @@index([taskId])
+}
